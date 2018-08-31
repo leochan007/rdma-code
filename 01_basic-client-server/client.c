@@ -196,7 +196,7 @@ void post_receives(struct connection *conn)
     wr.sg_list = &sge;
     wr.num_sge = 1;
 
-    sge.addr = (uintptr_t)conn;
+    sge.addr = (uintptr_t)conn->recv_region;
     sge.length = BUFFER_SIZE;
     sge.lkey = conn->recv_mr->lkey;
 
@@ -237,7 +237,7 @@ void on_completion(struct ibv_wc *wc)
     else
         die("on_completion: completion isn't a send or a receive.");
 
-    if (++conn->num_completions == 2)
+    if (++conn->num_completions == 3)
         rdma_disconnect(conn->id);
 }
 
@@ -289,7 +289,7 @@ void post_sends(struct connection *conn, char *message)
     struct ibv_send_wr wr, *bad_wr = NULL;
     struct ibv_sge sge;
 
-    snprintf(conn->send_region, BUFFER_SIZE, "message from passive/server side with pid %d", getpid());
+    snprintf(conn->send_region, BUFFER_SIZE, "message from client side with pid %d", getpid());
 
     printf("connected. posting send...\n");
 

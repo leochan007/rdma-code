@@ -237,7 +237,7 @@ void on_completion(struct ibv_wc *wc)
     else
         die("on_completion: completion isn't a send or a receive.");
 
-    if (++conn->num_completions == 2)
+    if (++conn->num_completions == 3)
         rdma_disconnect(conn->id);
 }
 
@@ -276,7 +276,7 @@ void post_sends(struct connection *conn, char *message)
     struct ibv_send_wr wr, *bad_wr = NULL;
     struct ibv_sge sge;
 
-    snprintf(conn->send_region, BUFFER_SIZE, "message from passive/server side with pid %d", getpid());
+    snprintf(conn->send_region, BUFFER_SIZE, "message from server side with pid %d", getpid());
 
     printf("connected. posting send...\n");
 
