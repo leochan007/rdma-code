@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
     bzero(&addr, sizeof(addr));
     TEST_Z(port = atoi(argv[1]));
     addr.sin_family = AF_INET;
-    addr.sin_port = htos(port);
+    addr.sin_port = htons(port);
     TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &addr));
     TEST_NZ(rdma_listen(listener, BACKLOG));
 
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
         rdma_ack_cm_event(event);
 
         if(on_event(&event_copy))
-            return;
+            break;
     }
 
     rdma_destroy_id(listener);
@@ -126,7 +126,7 @@ int on_connect_request(struct rdma_cm_id *id)
     register_memory(conn);
     post_receives(conn);
 
-    bzero(&cm_params, sizeof(cm_params))
+    bzero(&cm_params, sizeof(cm_params));
     TEST_NZ(rdma_accept(id, &cm_params));
 
     return 0;
