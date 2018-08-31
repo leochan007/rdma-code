@@ -315,8 +315,10 @@ void on_completion_server(struct ibv_wc *wc)
     if (wc->opcode & IBV_WC_RECV)
     {
         printf("\nrecv success\n");
-        if (conn->recv_msg->type == MSG_DONE)
+        if (conn->recv_msg->type == MSG_DONE){
             printf("Client read finish\n");
+            rdma_disconnect(conn->id);
+        }
     }
     else
     {
