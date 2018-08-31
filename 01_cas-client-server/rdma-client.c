@@ -283,7 +283,7 @@ int on_disconnect_client(struct rdma_cm_id *id)
 {
     printf("peer disconnected.\n");
     destroy_connection_client(id->context);
-    return 0;
+    return 1;
 }
 
 int on_event(struct rdma_cm_event *event)
