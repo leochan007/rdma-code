@@ -260,7 +260,7 @@ int on_disconnect(struct rdma_cm_id *id)
 {
     printf("disconnected.\n");
     destroy_connection_client(id->context);
-    return 1; /* exit event loop */
+    return 1;
 }
 
 void destroy_connection_client(void *context)
