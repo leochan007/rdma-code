@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     freeaddrinfo(addr);
 
     while (rdma_get_cm_event(ec, &event) == 0) {
-        struct rdma_cm_id event_copy;
+        struct rdma_cm_event event_copy;
 
         memcpy(&event_copy, event, sizeof(*event));
         rdma_ack_cm_event(event);
@@ -222,7 +222,7 @@ void *poll_cq(void *ctx)
 
 void on_completion(struct ibv_wc *wc)
 {
-    struct connection *conn = (struct connection *)(uintptr_t)wc->wc_id;
+    struct connection *conn = (struct connection *)(uintptr_t)wc->wr_id;
 
     if (wc->status != IBV_WC_SUCCESS)
         die("on_completion: status is not IBV_WC_SUCCESS.");

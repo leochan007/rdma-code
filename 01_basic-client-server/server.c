@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <rdma/rdma_cma.h>
+#include <pthread.h>
 
 #define TEST_NZ(x) do { if ( (x)) die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
@@ -67,9 +68,6 @@ int main(int argc, char *argv[])
     addr.sin_port = htos(port);
     TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *) &addr));
     TEST_NZ(rdma_listen(listener, BACKLOG));
-
-    port = ntohs(rdma_get_src_port(listener));
-    printf("listening on port %d.\n", port);
 
     while (rdma_get_cm_event(ec, &event) == 0) {
         struct rdma_cm_event event_copy;
@@ -223,7 +221,7 @@ void *poll_cq(void *ctx)
 
 void on_completion(struct ibv_wc *wc)
 {
-    struct connection *conn = (struct connection *)(uintptr_t)wc->wc_id;
+    struct connection *conn = (struct connection *)(uintptr_t)wc->wr_id;
 
     if (wc->status != IBV_WC_SUCCESS)
         die("on_completion: status is not IBV_WC_SUCCESS.");
