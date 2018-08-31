@@ -32,7 +32,7 @@ struct context {
     struct ibv_comp_channel *comp_channel;
 
     pthread_t cq_poller_thread;
-}
+};
 
 static struct context *s_ctx = NULL;
 
@@ -42,8 +42,8 @@ static int on_event(struct rdma_cm_event *event);
 static int on_addr_resolved(struct rdma_cm_id *id);
 static void build_context(struct ibv_context *verbs);
 static void build_qp_attr(struct ibv_qp_init_attr *qp_attr);
-static void register_memory(struct connect *conn);
-static void post_receives(struct connect *conn);
+static void register_memory(struct connection *conn);
+static void post_receives(struct connection *conn);
 static void *poll_cq(void *ctx);
 static void on_completion(struct ibv_wc *wc);
 static int on_route_resolved(struct rdma_cm_id *id);
@@ -95,13 +95,13 @@ int on_event(struct rdma_cm_event *event)
     int ret = 0;
 
     if (event->event == RDMA_CM_EVENT_ADDR_RESOLVED)
-        r = on_addr_resolved(event->id);
+        ret = on_addr_resolved(event->id);
     else if (event->event == RDMA_CM_EVENT_ROUTE_RESOLVED)
-        r = on_route_resolved(event->id);
+        ret = on_route_resolved(event->id);
     else if (event->event == RDMA_CM_EVENT_ESTABLISHED)
-        r = on_connection(event->id->context);
-    else if (event->event == RDMA_CM_EVENT_DISCONNECTION)
-        r = on_disconnect(event->id);
+        ret = on_connection(event->id->context);
+    else if (event->event == RDMA_CM_EVENT_DISCONNECTED)
+        ret = on_disconnect(event->id);
     else
         die("on_event: unknown event");
 
@@ -160,7 +160,7 @@ void build_qp_attr(struct ibv_qp_init_attr *qp_attr)
 
     qp_attr->send_cq = s_ctx->cq;
     qp_attr->recv_cq = s_ctx->cq;
-    qp_attr->qp_type = YBV_QPT_RC;
+    qp_attr->qp_type = IBV_QPT_RC;
 
     qp_attr->cap.max_send_wr = 10;
     qp_attr->cap.max_recv_wr = 10;
@@ -168,7 +168,7 @@ void build_qp_attr(struct ibv_qp_init_attr *qp_attr)
     qp_attr->cap.max_recv_sge = 1;
 }
 
-void register_memory(struct connect *conn)
+void register_memory(struct connection *conn)
 {
     conn->send_region = malloc(BUFFER_SIZE);
     conn->recv_region = malloc(BUFFER_SIZE);
@@ -186,7 +186,7 @@ void register_memory(struct connect *conn)
         IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE));
 }
 
-void post_receives(struct connect *conn)
+void post_receives(struct connection *conn)
 {
     struct ibv_recv_wr wr, *bad_wr = NULL;
     struct ibv_sge sge;

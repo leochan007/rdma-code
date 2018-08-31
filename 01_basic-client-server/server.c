@@ -10,6 +10,30 @@
 
 const int BUFFER_SIZE = 1024;
 
+struct connection {
+    struct rdma_cm_id *id;
+    struct ibv_qp *qp;
+
+    struct ibv_mr *recv_mr;
+    struct ibv_mr *send_mr;
+
+    char *recv_region;
+    char *send_region;
+
+    int num_completions;
+};
+
+struct context {
+    struct ibv_context *ctx;
+    struct ibv_pd *pd;
+    struct ibv_cq *cq;
+    struct ibv_comp_channel *comp_channel;
+
+    pthread_t cq_poller_thread;
+};
+
+static struct context *s_ctx = NULL;
+
 static void die(const char *reason);
 static int on_event(struct rdma_cm_event *event);
 static int on_connect_request(struct rdma_cm_id *id);
@@ -74,11 +98,11 @@ int on_event(struct rdma_cm_event *event)
     int ret = 0;
 
     if (event->event == RDMA_CM_EVENT_CONNECT_REQUEST)
-        r = on_connect_request(event->id);
-    else if (evnet->event == RDMA_CM_EVENT_ESTABLISHED)
-        r = on_connection(event->id->context);
-    else if (event->event == RDMA_CM_EVENT_DISCONNECT)
-        r = on_disconnect(event->id);
+        ret = on_connect_request(event->id);
+    else if (event->event == RDMA_CM_EVENT_ESTABLISHED)
+        ret = on_connection(event->id->context);
+    else if (event->event == RDMA_CM_EVENT_DISCONNECTED)
+        ret = on_disconnect(event->id);
     else
         die("on_event: unknown event");
 
