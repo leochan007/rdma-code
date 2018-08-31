@@ -173,13 +173,12 @@ int main(int argc, char **argv)
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     TEST_Z(port = atoi(argv[2]));
-    printf("listening on port %d.\n", port);
     addr.sin_port = htons(port);
 
     TEST_Z(ec = rdma_create_event_channel());
     TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
     TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *)&addr));
-    TEST_NZ(rdma_listen(listener, 10)); /* backlog=10 is arbitrary */
+    TEST_NZ(rdma_listen(listener, 10));
 
     port = ntohs(rdma_get_src_port(listener));
 
