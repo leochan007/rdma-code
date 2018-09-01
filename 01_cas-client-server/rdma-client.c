@@ -411,7 +411,7 @@ void on_completion_client(struct ibv_wc *wc)
         //printf("\nsum_of_test_cycles : %lf\n", sum_of_test_cycles);
         //printf("\ncpu time : %lf s, cpu frequency : %lf hz\n bandwidth : %lf MB/s, throughput : %lf MB/s\n", sum_of_test_cycles/cycles_to_units, cycles_to_units, bw_avg, tp_avg);
         fprintf(fp, "cputime %lf   throughput %lf\n", sum_of_test_cycles/cycles_to_units, tp_avg);
-        fp.close();
+        close(fp);
         rdma_disconnect(conn->id);
     }
 }
