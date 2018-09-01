@@ -401,7 +401,7 @@ void on_completion_client(struct ibv_wc *wc)
         }
         
         FILE *fp;
-        TEST_Z(fp = fopen("./data", "r"));
+        TEST_Z(fp = fopen("./data", "a"));
 
         end = get_cycles();
         cycles_to_units = get_cpu_mhz(0) * 1000000;
@@ -410,7 +410,7 @@ void on_completion_client(struct ibv_wc *wc)
         //double bw_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
         //printf("\nsum_of_test_cycles : %lf\n", sum_of_test_cycles);
         //printf("\ncpu time : %lf s, cpu frequency : %lf hz\n bandwidth : %lf MB/s, throughput : %lf MB/s\n", sum_of_test_cycles/cycles_to_units, cycles_to_units, bw_avg, tp_avg);
-        fprintf(fp, "cputime %lf   throughput %lf\n", sum_of_test_cycles/cycles_to_units, tp_avg);
+        fprintf(fp, "64B    cputime %lf   throughput %lf\n", sum_of_test_cycles/cycles_to_units, tp_avg);
         fclose(fp);
         rdma_disconnect(conn->id);
     }
