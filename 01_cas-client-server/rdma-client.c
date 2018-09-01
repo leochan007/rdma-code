@@ -401,7 +401,7 @@ void on_completion_client(struct ibv_wc *wc)
         }
         
         FILE *fp;
-        TEST_Z(fp = fopen("./data", "a"));
+        TEST_Z(fp = fopen("./data-cas-sequential", "a"));
 
         end = get_cycles();
         cycles_to_units = get_cpu_mhz(0) * 1000000;
