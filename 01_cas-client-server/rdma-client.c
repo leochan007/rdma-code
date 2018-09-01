@@ -110,10 +110,13 @@ void register_memory_client(struct connection_client *conn)
 {
     conn->recv_msg = malloc(sizeof(struct message));
     conn->rdma_local_region = malloc(RDMA_BUFFER_SIZE);
+    bzero(conn->recv_msg, sizeof(struct message));
+    bzero(conn->rdma_local_region, RDMA_BUFFER_SIZE);
     TEST_Z(conn->recv_mr = ibv_reg_mr(s_ctx->pd, conn->recv_msg, sizeof(struct message), IBV_ACCESS_LOCAL_WRITE));
     TEST_Z(conn->rdma_local_mr = ibv_reg_mr(s_ctx->pd, conn->rdma_local_region, RDMA_BUFFER_SIZE, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_READ));
 	
     conn->send_msg = malloc(sizeof(struct message));
+    bzero(conn->send_msg, sizeof(struct message));
     TEST_Z(conn->send_mr = ibv_reg_mr(s_ctx->pd, conn->send_msg, sizeof(struct message), IBV_ACCESS_LOCAL_WRITE));
 }
 
