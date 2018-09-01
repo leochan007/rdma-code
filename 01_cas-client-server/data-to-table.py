@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import xlwt
+import sys
 
-TABLE_NAME = 'data-cas-sequential'
+TABLE_NAME = sys.argv[1]
 
 def write_excel(path):
     workbook = xlwt.Workbook(encoding='utf-8')
