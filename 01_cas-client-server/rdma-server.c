@@ -114,6 +114,7 @@ void register_memory_server(struct connection_server *conn)
 {
     conn->send_msg = malloc(sizeof(struct message));
     conn->rdma_remote_region = malloc(RDMA_BUFFER_SIZE);
+    memset(conn->send_msg, 0, sizeof(struct message));
     memset(conn->rdma_remote_region, 'a', RDMA_BUFFER_SIZE);
 
     TEST_Z(conn->send_mr = ibv_reg_mr(s_ctx->pd, conn->send_msg, sizeof(struct message), IBV_ACCESS_LOCAL_WRITE));
