@@ -5,8 +5,8 @@
 ip=192.168.0.13
 port=12345
 
-if [ -f "data-cas-sequential" ]; then
-    rm data-cas-sequential
+if [ -f "data-cas-random" ]; then
+    rm data-cas-random
 fi
 
 for blocksize in 64 512 1024 2048 4096 16384 65536 131072
