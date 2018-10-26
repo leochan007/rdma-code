@@ -226,7 +226,7 @@ int main(int argc, char **argv)
 
     freeaddrinfo(addr);
 
-    max_prime = largest_prime_smaller_n(RDMA_BUFFER_SIZE/RDMA_BLOCK_SIZE);
+    int max_prime = largest_prime_smaller_n(RDMA_BUFFER_SIZE/RDMA_BLOCK_SIZE);
     random_num(max_prime);
 
     while (rdma_get_cm_event(ec, &event) == 0)
