@@ -177,7 +177,7 @@ int main(int argc, char **argv)
     TEST_Z(port = atoi(argv[2]));
     addr.sin_port = htons(port);
 
-    printf("Block Size : %d\n", argv[3]);
+    printf("Block Size : %s\n", argv[3]);
 
     TEST_Z(ec = rdma_create_event_channel());
     TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
