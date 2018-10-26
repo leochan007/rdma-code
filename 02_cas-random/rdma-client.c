@@ -16,6 +16,7 @@ unsigned long RDMA_BLOCK_SIZE;
 int offset = 0;
 char *point;
 unsigned long *rand_offset;
+int max_prime;
 
 cycles_t start, end;
 double cycles_to_units, sum_of_test_cycles;
@@ -226,7 +227,7 @@ int main(int argc, char **argv)
 
     freeaddrinfo(addr);
 
-    int max_prime = largest_prime_smaller_n(RDMA_BUFFER_SIZE/RDMA_BLOCK_SIZE);
+    max_prime = largest_prime_smaller_n(RDMA_BUFFER_SIZE/RDMA_BLOCK_SIZE);
     random_num(max_prime);
 
     while (rdma_get_cm_event(ec, &event) == 0)
