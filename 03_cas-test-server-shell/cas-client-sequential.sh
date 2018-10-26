@@ -17,8 +17,7 @@ while ((1))
 do
     if [ -f "~/jyh/start" ]; then
         rm ~/jyh/start
-        usleep 1000
-        ./rdma-client read $ip $port ${[$((count%5))]}
+        ./rdma-client read $ip $port ${blocksize[$((count/5))]}
         count=$(($count+1))
     fi
 done
