@@ -15,7 +15,7 @@ blocksize=(64 512 1024 2048 4096 16384 65536 131072)
 
 while ((1))
 do
-    if [ -f "~/jyh/start" ]; then
+    if [ -f "/home/lab/jyh/start" ]; then
         rm ~/jyh/start
         ./rdma-client read $ip $port ${blocksize[$((count/5))]}
         count=$(($count+1))
