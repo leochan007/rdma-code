@@ -13,6 +13,7 @@ while ((1))
 do
     if [ -f "../../start" ]; then
         rm ../../start
+        sleep 1
         for blocksize in 64 512 1024 2048 4096 16384 65536 131072
         do
             i=5
