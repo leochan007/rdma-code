@@ -405,14 +405,14 @@ void on_completion_client(struct ibv_wc *wc)
             point = conn->rdma_local_region + i;
         }
         end = get_cycles();  
-        sum_of_test_cycles = (double)(end - start);
+        sum_of_test_cycles += (double)(end - start);
 
         if(count == 0){
             FILE *fp;
             TEST_Z(fp = fopen("./data-cas-sequential", "a"));
 
 
-            cycles_to_units += get_cpu_mhz(0) * 1000000;
+            cycles_to_units = get_cpu_mhz(0) * 1000000;
             
             double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
             //double bw_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
