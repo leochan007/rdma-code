@@ -8,7 +8,8 @@
 #define TEST_NZ(x) do { if ( (x)) die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
-unsigned long RDMA_BUFFER_SIZE = 1024 * 1024 * 1024;
+unsigned long RDMA_BUFFER_SIZE = 1024 * 1024 * 512;
+int count = 1;
 
 struct message
 {
@@ -325,7 +326,8 @@ void on_completion_server(struct ibv_wc *wc)
     else
     {
         printf("send success\n");
-		post_receives_server(conn);
+        send_mr(conn);
+		// post_receives_server(conn);
     }
 }
 

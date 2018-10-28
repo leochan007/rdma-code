@@ -11,11 +11,12 @@
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
 const int TIMEOUT_IN_MS = 500;
-unsigned long RDMA_BUFFER_SIZE = 1024 * 1024 * 1024;
+unsigned long RDMA_BUFFER_SIZE = 1024 * 1024 * 512;
 unsigned long RDMA_BLOCK_SIZE;
 int offset = 0;
 char *point;
 unsigned long *rand_offset;
+int count = 1;
 
 cycles_t start, end;
 double cycles_to_units, sum_of_test_cycles;
@@ -403,20 +404,28 @@ void on_completion_client(struct ibv_wc *wc)
         for(int i = 0; i < RDMA_BUFFER_SIZE; i = i + RDMA_BLOCK_SIZE) {
             point = conn->rdma_local_region + i;
         }
-        
-        FILE *fp;
-        TEST_Z(fp = fopen("./data-cas-sequential", "a"));
-
-        end = get_cycles();
-        cycles_to_units = get_cpu_mhz(0) * 1000000;
+        end = get_cycles();  
         sum_of_test_cycles = (double)(end - start);
-        double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
-        //double bw_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
-        //printf("\nsum_of_test_cycles : %lf\n", sum_of_test_cycles);
-        //printf("\ncpu time : %lf s, cpu frequency : %lf hz\n bandwidth : %lf MB/s, throughput : %lf MB/s\n", sum_of_test_cycles/cycles_to_units, cycles_to_units, bw_avg, tp_avg);
-        fprintf(fp, "%lu cputime(s) %lf throughput(MB/s) %lf\n", RDMA_BLOCK_SIZE, sum_of_test_cycles/cycles_to_units, tp_avg);
-        fclose(fp);
-        rdma_disconnect(conn->id);
+
+        if(count == 0){
+            FILE *fp;
+            TEST_Z(fp = fopen("./data-cas-sequential", "a"));
+
+
+            cycles_to_units += get_cpu_mhz(0) * 1000000;
+            
+            double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
+            //double bw_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (sum_of_test_cycles * 0x100000);
+            //printf("\nsum_of_test_cycles : %lf\n", sum_of_test_cycles);
+            //printf("\ncpu time : %lf s, cpu frequency : %lf hz\n bandwidth : %lf MB/s, throughput : %lf MB/s\n", sum_of_test_cycles/cycles_to_units, cycles_to_units, bw_avg, tp_avg);
+            fprintf(fp, "%lu cputime(s) %lf throughput(MB/s) %lf\n", RDMA_BLOCK_SIZE, sum_of_test_cycles/cycles_to_units, tp_avg);
+            fclose(fp);
+            rdma_disconnect(conn->id);
+        }else{
+            count--;
+            post_receives(conn);
+        }
+
     }
 }
 
