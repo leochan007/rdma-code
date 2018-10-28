@@ -1,7 +1,7 @@
 #!/bin/bash
 # Program:
 #       Resolve the condition that program in server also need blocksize
-#       记得将server的disconnect函数返回值设为1，即结束server程序
+#       记得将server的disconnect函数返回值设为1，结束server程序
 
 touch start
 
