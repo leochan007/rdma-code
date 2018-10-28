@@ -11,8 +11,8 @@ fi
 
 while ((1))
 do
-    if [ -f "~/jyh/start" ]; then
-        rm ~/jyh/start
+    if [ -f "../../start" ]; then
+        rm ../../start
         for blocksize in 64 512 1024 2048 4096 16384 65536 131072
         do
             i=5
