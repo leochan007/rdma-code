@@ -4,7 +4,7 @@
 
 touch start
 
-scp start lab@192.168.0.15:~/jyh
+scp start lab@192.168.0.15:~/jyh lab@192.168.0.11:~/jyh
 ./rdma-server read 12345
 
 exit 0
