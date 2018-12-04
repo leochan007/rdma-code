@@ -17,6 +17,9 @@ unsigned long *data_mapping_table;
 unsigned long pre_index = 0;
 
 /*
+    fix port:
+        func main
+
     build app data with mapping table:
         func register_memory
 
@@ -133,13 +136,13 @@ static enum mode s_mode = M_WRITE;
 
 int main(int argc, char **argv)
 {
-    struct sockaddr_in6 addr;
+    struct sockaddr_in addr;
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_id *listener = NULL;
     struct rdma_event_channel *ec = NULL;
     uint16_t port = 0;
 
-    if (argc != 2)
+    if (argc != 3)
         usage(argv[0]);
 
     if (strcmp(argv[1], "write") == 0)
@@ -150,7 +153,11 @@ int main(int argc, char **argv)
         usage(argv[0]);
 
     memset(&addr, 0, sizeof(addr));
-    addr.sin6_family = AF_INET6;
+    addr.sin_family = AF_INET;
+    /* fix port */
+    TEST_Z(port = atoi(argv[2]));
+    addr.sin_port = htons(port);
+    /* end */
 
     TEST_Z(ec = rdma_create_event_channel());
     TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
@@ -179,7 +186,7 @@ int main(int argc, char **argv)
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "usage: %s <mode>\n  mode = \"read\", \"write\"\n", argv0);
+    fprintf(stderr, "usage: %s <mode> port \n  mode = \"read\", \"write\"\n", argv0);
     exit(1);
 }
 
