@@ -451,7 +451,6 @@ void on_completion(struct ibv_wc *wc)
 void send_write_data(struct connection *conn, unsigned long index)
 {
     char *data_addr = (char *)look_up_addr(data_mapping_table, index, pre_index);
-    printf("data addr : %lx \n", (unsigned long)data_addr);
     memcpy(conn->rdma_local_region, data_addr, RDMA_BLOCK_SIZE);
     send_post_rdma_write(conn);
 }

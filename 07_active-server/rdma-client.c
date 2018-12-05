@@ -15,6 +15,8 @@ static int RDMA_BLOCK_SIZE;
 const int TIMEOUT_IN_MS = 500;
 char *app_data;
 
+cycles_t start, end;
+
 /*
     set RDMA_BLOCK_SIZE:
         func main
@@ -34,9 +36,6 @@ char *app_data;
 
     send read done message:
         func send_mr_read_done
-
-    Q:
-        register_memory : conn->recv_mr s_mode ???
 */
 
 enum mode {
@@ -383,6 +382,7 @@ void build_params(struct rdma_conn_param *params)
 int on_connection(struct rdma_cm_id *id)
 {
     on_connect(id->context);
+    start = get_cycles();
     send_mr_read_data(id->context, s_ctx->index);
 
     return 0;
@@ -467,11 +467,17 @@ void on_completion(struct ibv_wc *wc)
     if (wc->opcode & IBV_WC_RECV) {
         if (conn->recv_msg->type == MSG_RDMA_WRITE_FINISH) {
             memcpy(app_data, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
-            printf("time : %ld \n", s_ctx->time);
 
             s_ctx->index += 1;
             s_ctx->time++;
             if (s_ctx->time == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
+                end = get_cycles();
+                double total_cycles = (double)(end - start);
+                double cycles_to_units = get_cpu_mhz(0) * 1000000;
+                double bw_avg = ((double) (RDMA_BUFFER_SIZE + 2 * (s_ctx->time + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
+                double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (total_cycles * 0x100000);
+                printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
+                
                 send_mr_read_done(conn);
             } else {
                 send_mr_read_data(conn, s_ctx->index);
