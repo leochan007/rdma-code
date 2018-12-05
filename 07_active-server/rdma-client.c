@@ -9,8 +9,8 @@
 #define TEST_NZ(x) do { if ( (x)) die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
-static const int RDMA_BUFFER_SIZE = 1024 * 1024 * 1024;
-static const int DATA_BUFFER_SIZE = 1024 * 1024 * 1024;
+static const int RDMA_BUFFER_SIZE = 1 * 1024 * 1024;
+static const int DATA_BUFFER_SIZE = 1 * 1024 * 1024;
 static int RDMA_BLOCK_SIZE;
 const int TIMEOUT_IN_MS = 500;
 char *app_data;
@@ -25,12 +25,15 @@ char *app_data;
     design message:
         struct message
 
-    initial index:
+    initial index / time:
         struct context
         func build_context
 
     send read data message:
         func send_mr_read_data
+
+    send read done message:
+        func send_mr_read_done
 
     Q:
         register_memory : conn->recv_mr s_mode ???
@@ -63,6 +66,7 @@ struct context {
     struct ibv_comp_channel *comp_channel;
     /* initialize index */
     unsigned long index;
+    unsigned long time;
     /* end */
 
     pthread_t cq_poller_thread;
@@ -126,6 +130,7 @@ static int on_disconnect(struct rdma_cm_id *id);
 static void destroy_connection(void *context);
 
 static void on_completion(struct ibv_wc *wc);
+static void send_mr_read_done(void *context);
 
 static struct context *s_ctx = NULL;
 static enum mode s_mode = M_WRITE;
@@ -259,6 +264,7 @@ void build_context(struct ibv_context *verbs)
 
     /* initialize index */
     s_ctx->index = 0;
+    s_ctx->time = 0;
     /* end */
 
     TEST_Z(s_ctx->pd = ibv_alloc_pd(s_ctx->ctx));
@@ -393,7 +399,6 @@ void send_mr_read_data(void *context, unsigned long index)
 
     conn->send_msg->type = MSG_READ_DATA;
 
-    memset(conn->send_msg, 0, sizeof(struct message));
     memcpy(&conn->send_msg->data.mr, conn->rdma_remote_mr, sizeof(struct ibv_mr));
     conn->send_msg->data.index = s_ctx->index;
     send_message(conn);
@@ -419,6 +424,8 @@ void send_message(struct connection *conn)
     while (!conn->connected);
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
+
+    conn->send_state = SS_MR_SENT;
 }
 
 int on_disconnect(struct rdma_cm_id *id)
@@ -460,12 +467,29 @@ void on_completion(struct ibv_wc *wc)
     if (wc->opcode & IBV_WC_RECV) {
         if (conn->recv_msg->type == MSG_RDMA_WRITE_FINISH) {
             memcpy(app_data, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
-            int i;
-            for (i = 0; i < 20; i++)
-                printf("%c ", *(app_data + i));
-            printf("\n");
+            printf("time : %ld \n", s_ctx->time);
+
+            s_ctx->index += 1;
+            s_ctx->time++;
+            if (s_ctx->time == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
+                send_mr_read_done(conn);
+            } else {
+                send_mr_read_data(conn, s_ctx->index);
+            }
         }
     } else {
-        post_receives(conn);
+        if (conn->send_state == SS_MR_SENT) {
+            post_receives(conn);
+            conn->send_state = SS_INIT;
+        }
     }
+}
+
+void send_mr_read_done(void *context)
+{
+    struct connection *conn = (struct connection *)context;
+
+    conn->send_msg->type = MSG_READ_DONE;
+
+    send_message(conn);
 }

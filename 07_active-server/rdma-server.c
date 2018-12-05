@@ -9,9 +9,10 @@
 #define TEST_NZ(x) do { if ( (x)) die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
-static const int RDMA_BUFFER_SIZE = 1024 * 1024 * 1024;
-static const int DATA_BUFFER_SIZE = 1024 * 1024 * 1024;
+static const int RDMA_BUFFER_SIZE = 1 * 1024 * 1024;
+static const int DATA_BUFFER_SIZE = 1 * 1024 * 1024;
 static const int DATA_BLOCK_SIZE = 4 * 1024;
+static int RDMA_BLOCK_SIZE = 4 * 1024;
 char *app_data;
 unsigned long *data_mapping_table;
 unsigned long pre_index = 0;
@@ -436,17 +437,22 @@ void on_completion(struct ibv_wc *wc)
             send_mr_rdma_write_finish(conn);
             conn->send_state = SS_DONE_SENT;
         }
-        on_disconnect(conn->id);
+        if (conn->recv_msg->type == MSG_READ_DONE) {
+            on_disconnect(conn->id);
+        }
     } else {
-        if (conn->send_state == SS_DONE_SENT)
+        if (conn->send_state == SS_DONE_SENT){
             post_receives(conn);
+            conn->send_state = SS_INIT;
+        }
     }
 }
 
 void send_write_data(struct connection *conn, unsigned long index)
 {
     char *data_addr = (char *)look_up_addr(data_mapping_table, index, pre_index);
-    memcpy(conn->rdma_local_region, data_addr, DATA_BLOCK_SIZE);
+    printf("data addr : %lx \n", (unsigned long)data_addr);
+    memcpy(conn->rdma_local_region, data_addr, RDMA_BLOCK_SIZE);
     send_post_rdma_write(conn);
 }
 
@@ -476,7 +482,7 @@ void send_post_rdma_write(struct connection *conn)
     wr.wr.rdma.rkey = conn->peer_mr.rkey;
 
     sge.addr = (uintptr_t)conn->rdma_local_region;
-    sge.length = DATA_BLOCK_SIZE;
+    sge.length = RDMA_BLOCK_SIZE;
     sge.lkey = conn->rdma_local_mr->lkey;
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
