@@ -455,7 +455,7 @@ void on_completion(struct ibv_wc *wc)
         die("on_completion: status is not IBV_WC_SUCCESS.");
 
     if (wc->opcode & IBV_WC_RECV) {
-        if (conn->recv_msg->type == MSG_READ_DATA) {
+        if (wc->imm_data == 100) {
             memcpy(app_data + s_ctx->index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
             s_ctx->index++;
             printf("index : %d \n", s_ctx->index);
