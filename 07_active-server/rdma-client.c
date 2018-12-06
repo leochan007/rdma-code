@@ -462,7 +462,7 @@ void on_completion(struct ibv_wc *wc)
                 end = get_cycles();
                 double total_cycles = (double)(end - start);
                 double cycles_to_units = get_cpu_mhz(0) * 1000000;
-                double bw_avg = ((double) (RDMA_BUFFER_SIZE + (s_ctx->time + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
+                double bw_avg = ((double) (RDMA_BUFFER_SIZE + (s_ctx->index + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
                 double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (total_cycles * 0x100000);
                 printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
                 

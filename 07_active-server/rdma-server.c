@@ -30,8 +30,6 @@ unsigned long pre_index = 0;
         func look_up_addr
     send post rdma post write:
         func send_post_rdma_write
-    send rdma write finish:
-        func send_mr_rdma_write_finish
     Q:
         RDMA_BUFFER_SIZE need 1024 * 1024 * 1024 ?
 */
@@ -121,7 +119,6 @@ static void on_completion(struct ibv_wc *wc);
 static void send_write_data(struct connection *conn, unsigned long index);
 static unsigned long look_up_addr(unsigned long *p, unsigned long index, unsigned long pre);
 static void send_post_rdma_write(struct connection *conn);
-static void send_mr_rdma_write_finish(void *context);
 static void send_message(struct connection *conn);
 
 static struct context *s_ctx = NULL;
@@ -472,15 +469,6 @@ void send_post_rdma_write(struct connection *conn)
     sge.lkey = conn->rdma_local_mr->lkey;
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
-}
-
-void send_mr_rdma_write_finish(void *context)
-{
-    struct connection *conn = (struct connection *)context;
-
-    conn->send_msg->type = MSG_RDMA_WRITE_FINISH;
-
-    send_message(conn);
 }
 
 void send_message(struct connection *conn)
