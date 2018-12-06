@@ -24,7 +24,7 @@ cycles_t start, end;
         func register_memory
     design message:
         struct message
-    initial index / time:
+    initial index:
         struct context
         func build_context
     send read data message:
@@ -42,7 +42,6 @@ enum mode {
 struct message {
     enum {
         MSG_READ_DATA,
-        MSG_RDMA_WRITE_FINISH,
         MSG_READ_DONE
     } type;
 
@@ -60,7 +59,6 @@ struct context {
     struct ibv_comp_channel *comp_channel;
     /* initialize index */
     unsigned long index;
-    unsigned long time;
     /* end */
 
     pthread_t cq_poller_thread;
@@ -258,7 +256,6 @@ void build_context(struct ibv_context *verbs)
 
     /* initialize index */
     s_ctx->index = 0;
-    s_ctx->time = 0;
     /* end */
 
     TEST_Z(s_ctx->pd = ibv_alloc_pd(s_ctx->ctx));
@@ -266,15 +263,6 @@ void build_context(struct ibv_context *verbs)
     TEST_Z(s_ctx->cq = ibv_create_cq(s_ctx->ctx, 10, NULL, s_ctx->comp_channel, 0)); /* cqe=10 is arbitrary */
     TEST_NZ(ibv_req_notify_cq(s_ctx->cq, 0));
 
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
-    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
     TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
 }
 
@@ -428,8 +416,6 @@ void send_message(struct connection *conn)
     while (!conn->connected);
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
-
-    conn->send_state = SS_MR_SENT;
 }
 
 int on_disconnect(struct rdma_cm_id *id)
@@ -476,7 +462,7 @@ void on_completion(struct ibv_wc *wc)
                 end = get_cycles();
                 double total_cycles = (double)(end - start);
                 double cycles_to_units = get_cpu_mhz(0) * 1000000;
-                double bw_avg = ((double) (RDMA_BUFFER_SIZE + 2 * (s_ctx->time + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
+                double bw_avg = ((double) (RDMA_BUFFER_SIZE + (s_ctx->time + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
                 double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (total_cycles * 0x100000);
                 printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
                 

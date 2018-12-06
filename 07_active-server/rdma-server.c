@@ -45,7 +45,6 @@ enum mode {
 struct message {
     enum {
         MSG_READ_DATA,
-        MSG_RDMA_WRITE_FINISH,
         MSG_READ_DONE
     } type;
 
