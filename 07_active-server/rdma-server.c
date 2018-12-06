@@ -434,17 +434,12 @@ void on_completion(struct ibv_wc *wc)
         if (conn->recv_msg->type == MSG_READ_DATA) {
             memcpy(&conn->peer_mr, &conn->recv_msg->data.mr, sizeof(conn->peer_mr));
             send_write_data(conn, conn->recv_msg->data.index);
-            send_mr_rdma_write_finish(conn);
-            conn->send_state = SS_DONE_SENT;
         }
         if (conn->recv_msg->type == MSG_READ_DONE) {
             on_disconnect(conn->id);
         }
     } else {
-        if (conn->send_state == SS_DONE_SENT){
-            post_receives(conn);
-            conn->send_state = SS_INIT;
-        }
+        post_receives(conn);
     }
 }
 
@@ -473,7 +468,7 @@ void send_post_rdma_write(struct connection *conn)
     memset(&wr, 0, sizeof(wr));
 
     wr.wr_id = (uintptr_t)conn;
-    wr.opcode = (s_mode == M_WRITE) ? IBV_WR_RDMA_WRITE : IBV_WR_RDMA_READ;
+    wr.opcode = (s_mode == M_WRITE) ? IBV_WR_RDMA_WRITE_WITH_IMM : IBV_WR_RDMA_READ;
     wr.sg_list = &sge;
     wr.num_sge = 1;
     wr.send_flags = IBV_SEND_SIGNALED;

@@ -272,6 +272,15 @@ void build_context(struct ibv_context *verbs)
     TEST_NZ(ibv_req_notify_cq(s_ctx->cq, 0));
 
     TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
+    TEST_NZ(pthread_create(&s_ctx->cq_poller_thread, NULL, poll_cq, NULL));
 }
 
 void * poll_cq(void *ctx)
@@ -465,12 +474,10 @@ void on_completion(struct ibv_wc *wc)
         die("on_completion: status is not IBV_WC_SUCCESS.");
 
     if (wc->opcode & IBV_WC_RECV) {
-        if (conn->recv_msg->type == MSG_RDMA_WRITE_FINISH) {
-            memcpy(app_data, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
-
-            s_ctx->index += 1;
-            s_ctx->time++;
-            if (s_ctx->time == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
+        if (conn->recv_msg->type == MSG_READ_DATA) {
+            memcpy(app_data + s_ctx->index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
+            s_ctx->index++;
+            if (s_ctx->index == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
                 end = get_cycles();
                 double total_cycles = (double)(end - start);
                 double cycles_to_units = get_cpu_mhz(0) * 1000000;
@@ -484,10 +491,7 @@ void on_completion(struct ibv_wc *wc)
             }
         }
     } else {
-        if (conn->send_state == SS_MR_SENT) {
-            post_receives(conn);
-            conn->send_state = SS_INIT;
-        }
+        post_receives(conn);
     }
 }
 
