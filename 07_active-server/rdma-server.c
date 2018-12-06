@@ -20,25 +20,18 @@ unsigned long pre_index = 0;
 /*
     fix port:
         func main
-
     build app data with mapping table:
         func register_memory
-
     design  message:
         struct message
-
     send write data:
         func send_write_data
-
     look up data:
         func look_up_addr
-
     send post rdma post write:
         func send_post_rdma_write
-
     send rdma write finish:
         func send_mr_rdma_write_finish
-
     Q:
         RDMA_BUFFER_SIZE need 1024 * 1024 * 1024 ?
 */

@@ -20,20 +20,15 @@ cycles_t start, end;
 /*
     set RDMA_BLOCK_SIZE:
         func main
-
     build app data:
         func register_memory
-
     design message:
         struct message
-
-    initial index:
+    initial index / time:
         struct context
         func build_context
-
     send read data message:
         func send_mr_read_data
-
     send read done message:
         func send_mr_read_done
 */
@@ -65,6 +60,7 @@ struct context {
     struct ibv_comp_channel *comp_channel;
     /* initialize index */
     unsigned long index;
+    unsigned long time;
     /* end */
 
     pthread_t cq_poller_thread;
@@ -262,6 +258,7 @@ void build_context(struct ibv_context *verbs)
 
     /* initialize index */
     s_ctx->index = 0;
+    s_ctx->time = 0;
     /* end */
 
     TEST_Z(s_ctx->pd = ibv_alloc_pd(s_ctx->ctx));
@@ -404,14 +401,11 @@ void send_mr_read_data(void *context, unsigned long index)
 {
     struct connection *conn = (struct connection *)context;
 
-    unsigned long time = DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE;
-    for (s_ctx->index = 0; s_ctx->index < time; s_ctx->index++) {
-        conn->send_msg->type = MSG_READ_DATA;
+    conn->send_msg->type = MSG_READ_DATA;
 
-        memcpy(&conn->send_msg->data.mr, conn->rdma_remote_mr, sizeof(struct ibv_mr));
-        conn->send_msg->data.index = s_ctx->index;
-        send_message(conn);
-    }
+    memcpy(&conn->send_msg->data.mr, conn->rdma_remote_mr, sizeof(struct ibv_mr));
+    conn->send_msg->data.index = s_ctx->index;
+    send_message(conn);
 }
 
 void send_message(struct connection *conn)
@@ -476,16 +470,19 @@ void on_completion(struct ibv_wc *wc)
 
     if (wc->opcode & IBV_WC_RECV) {
         if (conn->recv_msg->type == MSG_READ_DATA) {
-            memcpy(app_data + conn->recv_msg->data.index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
+            memcpy(app_data + s_ctx->index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
+            s_ctx->index++;
             if (s_ctx->index == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
                 end = get_cycles();
                 double total_cycles = (double)(end - start);
                 double cycles_to_units = get_cpu_mhz(0) * 1000000;
-                double bw_avg = ((double) (RDMA_BUFFER_SIZE + (s_ctx->index + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
+                double bw_avg = ((double) (RDMA_BUFFER_SIZE + 2 * (s_ctx->time + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
                 double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (total_cycles * 0x100000);
                 printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
                 
                 send_mr_read_done(conn);
+            } else {
+                send_mr_read_data(conn, s_ctx->index);
             }
         }
     } else {
