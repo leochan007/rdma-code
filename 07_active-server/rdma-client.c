@@ -458,6 +458,7 @@ void on_completion(struct ibv_wc *wc)
         if (conn->recv_msg->type == MSG_READ_DATA) {
             memcpy(app_data + s_ctx->index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
             s_ctx->index++;
+            printf("index : %d \n", s_ctx->index);
             if (s_ctx->index == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
                 end = get_cycles();
                 double total_cycles = (double)(end - start);
