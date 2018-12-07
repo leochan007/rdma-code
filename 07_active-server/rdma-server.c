@@ -10,12 +10,10 @@
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
 static const int RDMA_BUFFER_SIZE = 1 * 1024 * 1024;
-static const int DATA_BUFFER_SIZE = 1 * 1024 * 1024;
-static const int DATA_BLOCK_SIZE = 4 * 1024;
-static int RDMA_BLOCK_SIZE = 4 * 1024;
+static const int DATA_BUFFER_SIZE = RDMA_BUFFER_SIZE;
+static int RDMA_BLOCK_SIZE; 
 char *app_data;
 unsigned long *data_mapping_table;
-unsigned long pre_index = 0;
 
 /*
     fix port:
@@ -30,6 +28,8 @@ unsigned long pre_index = 0;
         func look_up_addr
     send post rdma post write:
         func send_post_rdma_write
+    send rdma write finish:
+        func send_mr_rdma_write_finish
     Q:
         RDMA_BUFFER_SIZE need 1024 * 1024 * 1024 ?
 */
@@ -43,6 +43,7 @@ enum mode {
 struct message {
     enum {
         MSG_READ_DATA,
+        MSG_RDMA_WRITE_FINISH,
         MSG_READ_DONE
     } type;
 
@@ -119,6 +120,7 @@ static void on_completion(struct ibv_wc *wc);
 static void send_write_data(struct connection *conn, unsigned long index);
 static unsigned long look_up_addr(unsigned long *p, unsigned long index, unsigned long pre);
 static void send_post_rdma_write(struct connection *conn);
+static void send_mr_rdma_write_finish(void *context);
 static void send_message(struct connection *conn);
 
 static struct context *s_ctx = NULL;
@@ -132,7 +134,7 @@ int main(int argc, char **argv)
     struct rdma_event_channel *ec = NULL;
     uint16_t port = 0;
 
-    if (argc != 3)
+    if (argc != 4)
         usage(argv[0]);
 
     if (strcmp(argv[1], "write") == 0)
@@ -147,6 +149,10 @@ int main(int argc, char **argv)
     /* fix port */
     TEST_Z(port = atoi(argv[2]));
     addr.sin_port = htons(port);
+    /* end */
+
+    /* set RDMA_BLOCK_SIZE */
+    TEST_Z(RDMA_BLOCK_SIZE = atoi(argv[3]));
     /* end */
 
     TEST_Z(ec = rdma_create_event_channel());
@@ -176,7 +182,7 @@ int main(int argc, char **argv)
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "usage: %s <mode> port \n  mode = \"read\", \"write\"\n", argv0);
+    fprintf(stderr, "usage: %s <mode> <port> <block-size> \n  mode = \"read\", \"write\"\n", argv0);
     exit(1);
 }
 
@@ -306,11 +312,11 @@ void register_memory(struct connection *conn)
             j = -1;
     }
 
-    unsigned long num_entries = DATA_BUFFER_SIZE / DATA_BLOCK_SIZE;
+    unsigned long num_entries = DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE;
     data_mapping_table = malloc(num_entries * 8);
     unsigned long *p = data_mapping_table;
     for (i = 0; i < num_entries; i++) {
-        *p = (unsigned long)(app_data + i * DATA_BLOCK_SIZE);
+        *p = (unsigned long)(app_data + i * RDMA_BLOCK_SIZE);
         p++;
     }
     /* end */
@@ -423,18 +429,24 @@ void on_completion(struct ibv_wc *wc)
         if (conn->recv_msg->type == MSG_READ_DATA) {
             memcpy(&conn->peer_mr, &conn->recv_msg->data.mr, sizeof(conn->peer_mr));
             send_write_data(conn, conn->recv_msg->data.index);
+            send_mr_rdma_write_finish(conn);
+            conn->send_state = SS_DONE_SENT;
         }
         if (conn->recv_msg->type == MSG_READ_DONE) {
             on_disconnect(conn->id);
         }
     } else {
-        post_receives(conn);
+        if (conn->send_state == SS_DONE_SENT){
+            post_receives(conn);
+            conn->send_state = SS_INIT;
+        }
     }
 }
 
 void send_write_data(struct connection *conn, unsigned long index)
 {
-    char *data_addr = (char *)look_up_addr(data_mapping_table, index, pre_index);
+    char *data_addr = (char *)look_up_addr(data_mapping_table, index, index);
+    printf("data addr : %lx \n", (unsigned long)data_addr);
     memcpy(conn->rdma_local_region, data_addr, RDMA_BLOCK_SIZE);
     send_post_rdma_write(conn);
 }
@@ -457,11 +469,10 @@ void send_post_rdma_write(struct connection *conn)
     memset(&wr, 0, sizeof(wr));
 
     wr.wr_id = (uintptr_t)conn;
-    wr.opcode = (s_mode == M_WRITE) ? IBV_WR_RDMA_WRITE_WITH_IMM : IBV_WR_RDMA_READ;
+    wr.opcode = (s_mode == M_WRITE) ? IBV_WR_RDMA_WRITE : IBV_WR_RDMA_READ;
     wr.sg_list = &sge;
     wr.num_sge = 1;
     wr.send_flags = IBV_SEND_SIGNALED;
-    wr.imm_data = 100;
     wr.wr.rdma.remote_addr = (uintptr_t)conn->peer_mr.addr;
     wr.wr.rdma.rkey = conn->peer_mr.rkey;
 
@@ -470,6 +481,15 @@ void send_post_rdma_write(struct connection *conn)
     sge.lkey = conn->rdma_local_mr->lkey;
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
+}
+
+void send_mr_rdma_write_finish(void *context)
+{
+    struct connection *conn = (struct connection *)context;
+
+    conn->send_msg->type = MSG_RDMA_WRITE_FINISH;
+
+    send_message(conn);
 }
 
 void send_message(struct connection *conn)

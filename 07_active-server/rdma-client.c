@@ -10,7 +10,7 @@
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
 
 static const int RDMA_BUFFER_SIZE = 1 * 1024 * 1024;
-static const int DATA_BUFFER_SIZE = 1 * 1024 * 1024;
+static const int DATA_BUFFER_SIZE = RDMA_BUFFER_SIZE;
 static int RDMA_BLOCK_SIZE;
 const int TIMEOUT_IN_MS = 500;
 char *app_data;
@@ -31,6 +31,8 @@ cycles_t start, end;
         func send_mr_read_data
     send read done message:
         func send_mr_read_done
+    Q:
+        register_memory : conn->recv_mr s_mode ???
 */
 
 enum mode {
@@ -42,6 +44,7 @@ enum mode {
 struct message {
     enum {
         MSG_READ_DATA,
+        MSG_RDMA_WRITE_FINISH,
         MSG_READ_DONE
     } type;
 
@@ -134,7 +137,7 @@ int main(int argc, char **argv)
     struct rdma_cm_id *conn= NULL;
     struct rdma_event_channel *ec = NULL;
 
-    if (argc != 4)
+    if (argc != 5)
         usage(argv[0]);
 
     if (strcmp(argv[1], "write") == 0)
@@ -144,11 +147,11 @@ int main(int argc, char **argv)
     else
         usage(argv[0]);
 
-    /* set RDMA_BLOCK_SIZE */
-    RDMA_BLOCK_SIZE = 4 * 1024;
-    /* end */
-
     TEST_NZ(getaddrinfo(argv[2], argv[3], NULL, &addr));
+
+    /* set RDMA_BLOCK_SIZE */
+    TEST_Z(RDMA_BLOCK_SIZE = atoi(argv[4]));
+    /* end */
 
     TEST_Z(ec = rdma_create_event_channel());
     TEST_NZ(rdma_create_id(ec, &conn, NULL, RDMA_PS_TCP));
@@ -173,7 +176,7 @@ int main(int argc, char **argv)
 
 void usage(const char *argv0)
 {
-    fprintf(stderr, "usage: %s <mode> <server-address> <server-port>\n  mode = \"read\", \"write\"\n", argv0);
+    fprintf(stderr, "usage: %s <mode> <server-address> <server-port> <block-size>\n  mode = \"read\", \"write\"\n", argv0);
     exit(1);
 }
 
@@ -416,6 +419,8 @@ void send_message(struct connection *conn)
     while (!conn->connected);
 
     TEST_NZ(ibv_post_send(conn->qp, &wr, &bad_wr));
+
+    conn->send_state = SS_MR_SENT;
 }
 
 int on_disconnect(struct rdma_cm_id *id)
@@ -455,25 +460,28 @@ void on_completion(struct ibv_wc *wc)
         die("on_completion: status is not IBV_WC_SUCCESS.");
 
     if (wc->opcode & IBV_WC_RECV) {
-        if (wc->imm_data == 100) {
-            memcpy(app_data + s_ctx->index * RDMA_BLOCK_SIZE, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
+        if (conn->recv_msg->type == MSG_RDMA_WRITE_FINISH) {
+            memcpy(app_data, conn->rdma_remote_region, RDMA_BLOCK_SIZE);
+            printf("index : %lu \n", s_ctx->index);
+        
             s_ctx->index++;
-            printf("index : %d \n", s_ctx->index);
             if (s_ctx->index == DATA_BUFFER_SIZE / RDMA_BLOCK_SIZE) {
-                end = get_cycles();
+		        end = get_cycles();
                 double total_cycles = (double)(end - start);
                 double cycles_to_units = get_cpu_mhz(0) * 1000000;
-                double bw_avg = ((double) (RDMA_BUFFER_SIZE + (s_ctx->index + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
+                double bw_avg = ((double) (RDMA_BUFFER_SIZE + 2 * (s_ctx->index + 1) * sizeof(struct message)) * cycles_to_units) / (total_cycles * 0x100000);
                 double tp_avg = ((double) RDMA_BUFFER_SIZE * cycles_to_units) / (total_cycles * 0x100000);
-                printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
-                
+		        printf("\ncpu time : %lf s, bandwidth : %lf MB/s, throughput : %lf MB/s\n", total_cycles / cycles_to_units, bw_avg, tp_avg);
                 send_mr_read_done(conn);
             } else {
                 send_mr_read_data(conn, s_ctx->index);
             }
         }
     } else {
-        post_receives(conn);
+        if (conn->send_state == SS_MR_SENT) {
+            post_receives(conn);
+            conn->send_state = SS_INIT;
+        }
     }
 }
 
