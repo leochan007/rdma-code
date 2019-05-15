@@ -2,4 +2,4 @@
 
 **Linux网络编程实例**
 
-RDMA通信
+RDMA Sequential 实验测试代码
