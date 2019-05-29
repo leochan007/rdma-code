@@ -204,7 +204,7 @@ int main(int argc, char **argv)
         die("usage: client <server-address>");
 
     char rdma_port[6];
-    TEST_NE(sprintf(rdma_port, "%d", RDMA_PORT));
+    TEST_NP(sprintf(rdma_port, "%d", RDMA_PORT));
 
     TEST_NZ(getaddrinfo(argv[1], rdma_port, NULL, &addr));
 
