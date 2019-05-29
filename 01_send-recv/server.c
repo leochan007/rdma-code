@@ -1,5 +1,6 @@
 #include "rdma_global.h"
 #include <stdint.h>
+#include <unistd.h>
 
 const uint16_t RDMA_PORT = 12580;
 const int BUFFER_SIZE = 1024;

@@ -1,10 +1,30 @@
 #include "rdma_global.h"
 #include <stdint.h>
 #include <netdb.h>
+#include <unistd.h>
 
 const uint16_t RDMA_PORT = 12580;
 const int BUFFER_SIZE = 1024;
 const int TIMEOUT_IN_MS = 500;
+
+void post_receive(struct rdma_connection *conn)
+{
+    struct ibv_sge sge = {
+        .addr = (uint64_t)conn->recv_region,
+        .length = BUFFER_SIZE,
+        .lkey = conn->recv_mr->lkey
+    };
+
+    struct ibv_recv_wr wr = {
+        .wr_id = (uint64_t)conn,
+        .next = NULL,
+        .sg_list = &sge,
+        .num_sge = 1
+    };
+    struct ibv_recv_wr *bad_wr = NULL;
+
+    TEST_NZ(ibv_post_recv(conn->id->qp, &wr, &bad_wr));
+}
 
 void on_completion(struct ibv_wc *wc)
 {
@@ -157,7 +177,7 @@ int on_event(struct rdma_cm_event *event)
         ret = on_route_resolved(event->id);
     else if (event->event == RDMA_CM_EVENT_ESTABLISHED)
         ret = on_connection(event->id);
-    else if (event->evnet == RDMA_CM_EVENT_DISCONNECTION)
+    else if (event->event == RDMA_CM_EVENT_DISCONNECTED)
         ret = on_disconnect(event->id);
     else    
         die("on_event: unknown event.");
