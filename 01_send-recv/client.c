@@ -1,33 +1,16 @@
 #include "rdma_global.h"
 #include <stdint.h>
+#include <netdb.h>
 
 const uint16_t RDMA_PORT = 12580;
 const int BUFFER_SIZE = 1024;
-
-void post_receive(struct rdma_connection *conn)
-{
-    struct ibv_sge sge = {
-        .addr = (uint64_t)conn->recv_region,
-        .length = BUFFER_SIZE,
-        .lkey = conn->recv_mr->lkey
-    };
-
-    struct ibv_recv_wr wr = {
-        .wr_id = (uint64_t)conn,
-        .next = NULL,
-        .sg_list = &sge,
-        .num_sge = 1
-    };
-    struct ibv_recv_wr *bad_wr = NULL;
-
-    TEST_NZ(ibv_post_recv(conn->id->qp, &wr, &bad_wr));
-}
+const int TIMEOUT_IN_MS = 500;
 
 void on_completion(struct ibv_wc *wc)
 {
     if (wc->status != IBV_WC_SUCCESS)
         die("on_completion: status is not IBV_WC_SUCCESS.");
-    
+
     if (wc->opcode & IBV_WC_RECV) {
         struct rdma_connection *conn = (struct rdma_connection *)wc->wr_id;
         printf("received message: %s\n", conn->recv_region);
@@ -54,11 +37,11 @@ void *poll_cq(void *context)
     return NULL;
 }
 
-int on_connect_request(struct rdma_cm_id *id)
+int on_addr_resolved(struct rdma_cm_id *id)
 {
     struct rdma_connection *conn;
 
-    INFO("Server has received connection request.\n");
+    INFO("Address resolved.\n");
 
     // build rdma context
     id->context = conn = (void *)malloc(sizeof(struct rdma_connection));
@@ -100,7 +83,7 @@ int on_connect_request(struct rdma_cm_id *id)
 
     post_receive(conn);
 
-    TEST_NZ(rdma_accept(id, NULL));
+    TEST_NZ(rdma_resolve_route(id, TIMEOUT_IN_MS));
 
     return 0;
 }
@@ -108,10 +91,10 @@ int on_connect_request(struct rdma_cm_id *id)
 int on_connection(struct rdma_cm_id *id)
 {
     struct rdma_connection *conn = (struct rdma_connection *)id->context;
+    
+    INFO("Connectioned to Server.\n");
 
-    INFO("Server has been connected.\n");
-
-    TEST_NE(snprintf(conn->send_region, BUFFER_SIZE, "message from server side with pid %d", getpid()));
+    TEST_NE(snprintf(conn->send_region, BUFFER_SIZE, "message from client side with pid %d", getpid()));
 
     struct ibv_sge sge = {
         .addr = (uint64_t)conn->send_region,
@@ -128,6 +111,13 @@ int on_connection(struct rdma_cm_id *id)
     struct ibv_send_wr *bad_wr = NULL;
 
     ibv_post_send(id->qp, &wr, &bad_wr);
+}
+
+int on_route_resolved(struct rdma_cm_id *id)
+{
+    INFO("Route resolved.\n");
+
+    TEST_NZ(rdma_connect(id, NULL));
 
     return 0;
 }
@@ -136,7 +126,7 @@ int on_disconnect(struct rdma_cm_id *id)
 {
     struct rdma_connection *conn = (struct rdma_connection *)id->context;
 
-    INFO("peer disconnected.\n");
+    INFO("Disconnected.\n");
 
     rdma_destroy_qp(id);
     
@@ -154,42 +144,47 @@ int on_disconnect(struct rdma_cm_id *id)
     free(conn);
     rdma_destroy_id(id);
 
-    return 0;
+    return 1;
 }
 
 int on_event(struct rdma_cm_event *event)
 {
     int ret = 0;
 
-    if (event->event == RDMA_CM_EVENT_CONNECT_REQUEST)
-        ret = on_connect_request(event->id);
+    if (event->event == RDMA_CM_EVENT_ADDR_RESOLVED)
+        ret = on_addr_resolved(event->id);
+    else if (event->event == RDMA_CM_EVENT_ROUTE_RESOLVED)
+        ret = on_route_resolved(event->id);
     else if (event->event == RDMA_CM_EVENT_ESTABLISHED)
         ret = on_connection(event->id);
-    else if (event->event == RDMA_CM_EVENT_DISCONNECTED)
+    else if (event->evnet == RDMA_CM_EVENT_DISCONNECTION)
         ret = on_disconnect(event->id);
-    else
+    else    
         die("on_event: unknown event.");
-
+    
     return ret;
 }
 
 int main(int argc, char **argv)
 {
-    struct sockaddr_in addr;
+    struct addrinfo *addr;
     struct rdma_cm_event *event = NULL;
-    struct rdma_cm_id *listener = NULL;
+    struct rdma_cm_id *client = NULL;
     struct rdma_event_channel *ec = NULL;
 
-    memset(&addr, 0, sizeof(struct sockaddr_in));
-    addr.sin_family = AF_INET;
-    TEST_Z(addr.sin_port = htons(RDMA_PORT));
+    if (argc != 2)
+        die("usage: client <server-address>");
+
+    char rdma_port[6];
+    TEST_NE(sprintf(rdma_port, "%d", RDMA_PORT));
+
+    TEST_NZ(getaddrinfo(argv[1], rdma_port, NULL, &addr));
 
     TEST_Z(ec = rdma_create_event_channel());
-    TEST_NZ(rdma_create_id(ec, &listener, NULL, RDMA_PS_TCP));
-    TEST_NZ(rdma_bind_addr(listener, (struct sockaddr *)&addr));
-    TEST_NZ(rdma_listen(listener, 10));
+    TEST_NZ(rdma_create_id(ec, &client, NULL, RDMA_PS_TCP));
+    TEST_NZ(rdma_resolve_addr(client, NULL, addr->ai_addr, TIMEOUT_IN_MS));
 
-    INFO("Listen on port %d.\n", RDMA_PORT);
+    freeaddrinfo(addr);
 
     while (rdma_get_cm_event(ec, &event) == 0) {
         struct rdma_cm_event event_copy;
@@ -199,9 +194,9 @@ int main(int argc, char **argv)
 
         if (on_event(&event_copy))
             break;
-    }
+    }    
 
-    rdma_destroy_id(listener);
+    rdma_destroy_id(client);
     rdma_destroy_event_channel(ec);
 
     return 0;

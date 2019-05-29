@@ -7,6 +7,7 @@
 
 #define TEST_NZ(x) do { if ( (x)) die("error: " #x " failed (returned non-zero)." ); } while (0)
 #define TEST_Z(x)  do { if (!(x)) die("error: " #x " failed (returned zero/null)."); } while (0)
+#define TEST_NE(x) do{ if((x) < 0) die("error " #x " failed (return negative)."); }while(0)
 
 #define __INFO
 #ifdef __INFO
