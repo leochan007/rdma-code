@@ -32,8 +32,9 @@ void on_completion(struct ibv_wc *wc)
     if (wc->status != IBV_WC_SUCCESS)
         die("on_completion: status is not IBV_WC_SUCCESS.");
 
+    struct rdma_connection *conn = (struct rdma_connection *)wc->wr_id;
+
     if (wc->opcode & IBV_WC_RECV) {
-        struct rdma_connection *conn = (struct rdma_connection *)wc->wr_id;
         printf("received message: %s\n", conn->recv_region);
     } else if (wc->opcode == IBV_WC_SEND) {
         printf("send completed successfully.\n");
