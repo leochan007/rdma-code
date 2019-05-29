@@ -1,6 +1,6 @@
 .PHONY: clean
 
-CFLAGS	:= -Wall -Werror -g
+CFLAGS	:= -Wall -g
 CC		:= gcc
 LDLIBS	:= ${LDLIBS} -lrdmacm -libverbs -lpthread
 

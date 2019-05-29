@@ -1,7 +1,7 @@
 #ifndef RDMA_COMMON_H
 #define RDMA_COMMON_H
 
-#include <rdma_cma.h>
+#include <rdma/rdma_cma.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -29,7 +29,7 @@ struct rdma_connection {
     struct ibv_comp_channel *comp_channel;
 
     pthread_t cq_poller_thread;
-}
+};
 
 extern void die(const char *reason);
 

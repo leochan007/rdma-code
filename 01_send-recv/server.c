@@ -1,4 +1,4 @@
-#include <rdma_global.h>
+#include "rdma_global.h"
 #include <stdint.h>
 
 const uint16_t RDMA_PORT = 12580;
@@ -7,16 +7,16 @@ const int BUFFER_SIZE = 1024;
 void post_receive(struct rdma_connection *conn)
 {
     struct ibv_sge sge = {
-        .addr = (uint64_t)conn->recv_region;
-        .length = BUFFER_SIZE;
-        .lkey = conn->recv_mr->lkey;
+        .addr = (uint64_t)conn->recv_region,
+        .length = BUFFER_SIZE,
+        .lkey = conn->recv_mr->lkey
     };
 
-    struct ibv_recv_wr = {
-        .wr_id = (uint64_t)conn;
-        .next = NULL;
-        .sge_list = &sge;
-        .num_sge = 1;
+    struct ibv_recv_wr wr = {
+        .wr_id = (uint64_t)conn,
+        .next = NULL,
+        .sg_list = &sge,
+        .num_sge = 1
     };
     struct ibv_recv_wr *bad_wr = NULL;
 
@@ -29,7 +29,7 @@ void on_completion(struct ibv_wc *wc)
         die("on_completion: status is not IBV_WC_SUCCESS.");
     
     if (wc->opcode & IBV_WC_RECV) {
-        struct rdma_connection *conn = (struct rdma_connection *)wr->id;
+        struct rdma_connection *conn = (struct rdma_connection *)wc->wr_id;
         printf("received message: %s\n", conn->recv_region);
     } else if (wc->opcode == IBV_WC_SEND) {
         printf("send completed successfully.\n");
@@ -61,10 +61,10 @@ int on_connect_request(struct rdma_cm_id *id)
     INFO("Server has received connection request.\n");
 
     // build rdma context
-    id->context = conn = (void *)malloc(sizeof(struct connection));
+    id->context = conn = (void *)malloc(sizeof(struct rdma_connection));
 
     conn->id = id;
-    TEST_Z(id->pd = ibv_create_pd(id->verbs));
+    TEST_Z(id->pd = ibv_alloc_pd(id->verbs));
     TEST_Z(conn->comp_channel = ibv_create_comp_channel(id->verbs));
     TEST_Z(conn->cq = ibv_create_cq(id->verbs, 10, NULL, conn->comp_channel, 0));
     TEST_NZ(ibv_req_notify_cq(conn->cq, 0));
@@ -72,14 +72,14 @@ int on_connect_request(struct rdma_cm_id *id)
     TEST_NZ(pthread_create(&conn->cq_poller_thread, NULL, poll_cq, conn));
 
     struct ibv_qp_init_attr qp_attr = {
-        .send_cq = conn->cq;
-        .recv_cq = conn->cq;
-        .qp_type = IBV_QPT_RC;
+        .send_cq = conn->cq,
+        .recv_cq = conn->cq,
+        .qp_type = IBV_QPT_RC,
         .cap = {
-            .max_send_wr = 10;
-            .max_recv_wr = 10;
-            .max_send_sge = 1;
-            .max_recv_sge = 1;
+            .max_send_wr = 10,
+            .max_recv_wr = 10,
+            .max_send_sge = 1,
+            .max_recv_sge = 1
         }
     };
     TEST_NZ(rdma_create_qp(id, id->pd, &qp_attr));
@@ -98,7 +98,7 @@ int on_connect_request(struct rdma_cm_id *id)
                                     BUFFER_SIZE, 
                                     IBV_ACCESS_LOCAL_WRITE));
 
-    post_receive();
+    post_receive(conn);
 
     TEST_NZ(rdma_accept(id, NULL));
 
@@ -107,21 +107,21 @@ int on_connect_request(struct rdma_cm_id *id)
 
 int on_connection(struct rdma_cm_id *id)
 {
-    struct rdma_connection *conn = (struct rdma_connection)id->context;
+    struct rdma_connection *conn = (struct rdma_connection *)id->context;
     
     struct ibv_sge sge = {
-        .addr = (uint64_t)conn->send_region;
-        .length = BUFFER_SIZE;
-        .lkey = conn->send_mr->lkey;
+        .addr = (uint64_t)conn->send_region,
+        .length = BUFFER_SIZE,
+        .lkey = conn->send_mr->lkey
     };
 
-    struct ibv_send_wr = {
-        .opcode = IBV_WR_SEND;
-        .sge_list = &sge;
-        .num_sge = 1;
-        .send_flags = IBV_SEND_SIGNALED;
+    struct ibv_send_wr wr = {
+        .opcode = IBV_WR_SEND,
+        .sg_list = &sge,
+        .num_sge = 1,
+        .send_flags = IBV_SEND_SIGNALED
     };
-    struct ibv_recv_wr *bad_wr = NULL;
+    struct ibv_send_wr *bad_wr = NULL;
 
     INFO("Server has been connected. Post send...\n");
 
@@ -132,14 +132,14 @@ int on_connection(struct rdma_cm_id *id)
 
 int on_disconnect(struct rdma_cm_id *id)
 {
-    struct connection *conn = (struct connection *)id->context;
+    struct rdma_connection *conn = (struct rdma_connection *)id->context;
 
     printf("peer disconnected.\n");
 
     rdma_destroy_qp(id);
     
-    ibv_destory_cq(conn->cq);
-    ibv_destory_comp_channel(conn->comp_channel);
+    ibv_destroy_cq(conn->cq);
+    ibv_destroy_comp_channel(conn->comp_channel);
 
     ibv_dereg_mr(conn->send_mr);
     ibv_dereg_mr(conn->recv_mr);
@@ -164,7 +164,7 @@ int on_event(struct rdma_cm_event *event)
     else if (event->event == RDMA_CM_EVENT_ESTABLISHED)
         ret = on_connection(event->id);
     else if (event->event == RDMA_CM_EVENT_DISCONNECTED)
-        ret = on_disconnection(event->id);
+        ret = on_disconnect(event->id);
     else
         die("on_event: unknown event.");
 
@@ -173,11 +173,12 @@ int on_event(struct rdma_cm_event *event)
 
 int main(int argc, char **argv)
 {
-    struct sockaddr_in addr = NULL;
+    struct sockaddr_in addr;
     struct rdma_cm_event *event = NULL;
     struct rdma_cm_id *listener = NULL;
     struct rdma_event_channel *ec = NULL;
 
+    memset(&addr, 0, sizeof(struct sockaddr_in));
     addr.sin_family = AF_INET;
     TEST_Z(addr.sin_port = htons(RDMA_PORT));
 
