@@ -114,7 +114,7 @@ int on_connection(struct rdma_cm_id *id)
 
     INFO("Server has been connected.\n");
 
-    TEST_NE(snprintf(conn->send_region, BUFFER_SIZE, "message from server side with pid %d", getpid()));
+    TEST_NP(snprintf(conn->send_region, BUFFER_SIZE, "message from server side with pid %d", getpid()));
 
     struct ibv_sge sge = {
         .addr = (uint64_t)conn->send_region,
