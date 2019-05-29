@@ -26,6 +26,7 @@ void post_receive(struct rdma_connection *conn)
     TEST_NZ(ibv_post_recv(conn->id->qp, &wr, &bad_wr));
 }
 
+static int nevent = 0;
 void on_completion(struct ibv_wc *wc)
 {
     if (wc->status != IBV_WC_SUCCESS)
@@ -37,16 +38,20 @@ void on_completion(struct ibv_wc *wc)
     } else if (wc->opcode == IBV_WC_SEND) {
         printf("send completed successfully.\n");
     }
+
+    if (++nevent == 2)
+        rdma_disconnect(conn->id);
 }
 
 void *poll_cq(void *context)
 {
     struct ibv_cq *cq;
     struct ibv_wc wc;
+    void *cq_context;
     struct rdma_connection *conn = (struct rdma_connection *)context;
 
     while (1) {
-        TEST_NZ(ibv_get_cq_event(conn->comp_channel, &cq, NULL));
+        TEST_NZ(ibv_get_cq_event(conn->comp_channel, &cq, &cq_context));
         ibv_ack_cq_events(cq, 1);
         TEST_NZ(ibv_req_notify_cq(cq, 0));
 
@@ -108,6 +113,15 @@ int on_addr_resolved(struct rdma_cm_id *id)
     return 0;
 }
 
+int on_route_resolved(struct rdma_cm_id *id)
+{
+    INFO("Route resolved.\n");
+
+    TEST_NZ(rdma_connect(id, NULL));
+
+    return 0;
+}
+
 int on_connection(struct rdma_cm_id *id)
 {
     struct rdma_connection *conn = (struct rdma_connection *)id->context;
@@ -131,15 +145,6 @@ int on_connection(struct rdma_cm_id *id)
     struct ibv_send_wr *bad_wr = NULL;
 
     ibv_post_send(id->qp, &wr, &bad_wr);
-
-    return 0;
-}
-
-int on_route_resolved(struct rdma_cm_id *id)
-{
-    INFO("Route resolved.\n");
-
-    TEST_NZ(rdma_connect(id, NULL));
 
     return 0;
 }
