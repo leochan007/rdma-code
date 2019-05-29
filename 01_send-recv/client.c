@@ -131,6 +131,8 @@ int on_connection(struct rdma_cm_id *id)
     struct ibv_send_wr *bad_wr = NULL;
 
     ibv_post_send(id->qp, &wr, &bad_wr);
+
+    return 0;
 }
 
 int on_route_resolved(struct rdma_cm_id *id)
