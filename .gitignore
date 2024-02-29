@@ -55,3 +55,5 @@ dkms.conf
 .vscode/
 *.txt
 !**/CMakeLists.txt
+build
+bin/*
